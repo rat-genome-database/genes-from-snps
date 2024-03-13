@@ -1,0 +1,6 @@
+<!DOCTYPE beans PUBLIC "-//SPRING//DTD BEAN//EN" "http://www.springframework.org/dtd/spring-beans.dtd">
+<beans>
+    <bean id="main" class="edu.mcw.rgd.genesFromSnps.Main">
+        <property name="version" value="Get Genes from SNPs -- build 3/12/2024"/>
+    </bean>
+</beans>
