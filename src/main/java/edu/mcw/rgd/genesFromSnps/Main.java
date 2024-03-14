@@ -58,7 +58,7 @@ public class Main {
                 int pos = Integer.parseInt(cols[2]);
                 List<Integer> geneIds = getGenesWithGeneCache(pos,pos,chr);
                 if (!geneIds.isEmpty()){
-                    logger.info("\t\tGetting Gene");
+                    logger.debug("\t\tGetting Gene");
                     String geneList = listOfGenesToPrint(geneIds);
                     bw.write("\t"+geneList);
                 }
@@ -69,7 +69,7 @@ public class Main {
                 // upstream (start, end+100000)
                 geneIds = getGenesWithGeneCache(pos,pos+100000,chr);
                 if (!geneIds.isEmpty()){
-                    logger.info("\t\tGetting genes Upstream 100000");
+                    logger.debug("\t\tGetting genes Upstream 100000");
                     String geneList = listOfGenesToPrint(geneIds);
                     bw.write("\t"+geneList);
                 }
@@ -81,7 +81,7 @@ public class Main {
                 int downstream = (pos<=5000) ? 0 : pos-5000;
                 geneIds = getGenesWithGeneCache(downstream,pos,chr);
                 if (!geneIds.isEmpty()){
-                    logger.info("\t\tGetting genes downstream 5000");
+                    logger.debug("\t\tGetting genes downstream 5000");
                     String geneList = listOfGenesToPrint(geneIds);
                     bw.write("\t"+geneList);
                 }
