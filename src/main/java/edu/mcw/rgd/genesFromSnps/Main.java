@@ -30,7 +30,7 @@ public class Main {
                     default:
                         main.run();
                         return;
-                    case "getRsIds":
+                    case "-getRsIds":
                         main.run2();
                         return;
 
