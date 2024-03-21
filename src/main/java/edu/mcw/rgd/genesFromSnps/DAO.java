@@ -2,6 +2,7 @@ package edu.mcw.rgd.genesFromSnps;
 
 import edu.mcw.rgd.dao.DataSourceFactory;
 import edu.mcw.rgd.dao.impl.*;
+import edu.mcw.rgd.dao.impl.variants.VariantDAO;
 import edu.mcw.rgd.dao.spring.variants.VariantMapQuery;
 import edu.mcw.rgd.dao.spring.variants.VariantSampleQuery;
 import edu.mcw.rgd.datamodel.*;
@@ -35,6 +36,7 @@ public class DAO {
     private GeneDAO geneDAO = new GeneDAO();
     private MapDAO mdao = new MapDAO();
     private RGDManagementDAO managementDAO = new RGDManagementDAO();
+    private VariantDAO vdao = new VariantDAO();
 
     public String getConnection(){
         return mdao.getConnectionInfo();
@@ -83,6 +85,10 @@ public class DAO {
             }
         }
         return geneList;
+    }
+
+    List<VariantMapData> getVariantsByLocation(String chr, int pos) throws Exception{
+        return vdao.getVariantsWithGeneLocation(372,chr,pos,pos);
     }
 
 }

@@ -24,8 +24,18 @@ public class Main {
         DefaultListableBeanFactory bf = new DefaultListableBeanFactory();
         new XmlBeanDefinitionReader(bf).loadBeanDefinitions(new FileSystemResource("properties/AppConfigure.xml"));
         try {
-            Main main =(Main) bf.getBean("main");
-            main.run();
+            Main main = (Main) bf.getBean("main");
+            for (int i = 0; i < args.length; i++) {
+                switch (args[i]) {
+                    default:
+                        main.run();
+                        return;
+                    case "-getRsIds":
+                        main.run2();
+                        return;
+
+                }
+            }
         }
         catch (Exception e) {
             Utils.printStackTrace(e, LogManager.getLogger("status"));
@@ -93,6 +103,92 @@ public class Main {
             bw.close();
             br.close();
         }
+        logger.info("Total runtime -- elapsed time: "+
+                Utils.formatElapsedTime(pipeStart,System.currentTimeMillis()));
+    }
+
+    void run2() throws Exception{
+        logger.info(version);
+        long pipeStart = System.currentTimeMillis();
+        logger.info("Pipeline started at "+sdt.format(new Date(pipeStart))+"\n");
+
+        String file = "data/hrdp_118strains_plus_F1_genotype_all_chr.gvcf.gz";
+        BufferedReader br = openFile(file);
+        BufferedWriter bw = new BufferedWriter(new FileWriter("updated_hrdp_118strains_plus_F1_genotype_all_chr.gvcf"));
+        String lineData;
+
+        while ((lineData = br.readLine()) != null) {
+            if (lineData.startsWith("#")){
+                bw.write(lineData+"\n");
+                continue;
+            }
+            String[] cols = lineData.split("\t");
+            // col[0] chr, col[1] pos, col[2] id (replace with rsId), col[3] ref, col[4] alt
+            int pos = 0;
+            String chr = "";
+            String id="";
+            String ref="";
+            String alt="";
+            String restOfLine = "";
+            for (int i = 0; i < cols.length; i++){
+                switch (i){
+                    case 0:
+                        chr = cols[i].replace("chr","");
+                        break;
+                    case 1:
+                        pos = Integer.parseInt(cols[i]);
+                        break;
+                    case 2:
+                        id = cols[i];
+                        break;
+                    case 3:
+                        ref = cols[i];
+                        break;
+                    case 4:
+                        alt = cols[i];
+                        break;
+                    default:
+                        if (i+1== cols.length)
+                            restOfLine += cols[i];
+                        else
+                            restOfLine += (cols[i]+"\t");
+                        break;
+                }
+            } // end for
+            if (Utils.isStringEmpty(chr) || pos == 0)
+                continue;
+            List<VariantMapData> vars = dao.getVariantsByLocation(chr,pos);
+            if (vars.isEmpty()){
+                bw.write("chr"+chr+"\t"+pos+"\t"+id+"\t"+ref+"\t"+alt+"\t"+restOfLine);
+            }
+            else {
+                if (vars.size() == 1) {
+                    VariantMapData v = vars.get(0);
+                    if (!Utils.isStringEmpty(v.getRsId()) && !Utils.stringsAreEqual(v.getRsId(), ".")) {
+                        if (Utils.stringsAreEqual(v.getReferenceNucleotide(), ref) && Utils.stringsAreEqual(v.getVariantNucleotide(), alt)) {
+                            id = v.getRsId();
+                        }
+                    }
+                    bw.write("chr" + chr + "\t" + pos + "\t" + id + "\t" + ref + "\t" + alt + "\t" + restOfLine);
+                } else {
+                    VariantMapData vmd = new VariantMapData();
+                    for (VariantMapData variantMapData : vars) {
+                        if (Utils.stringsAreEqual(variantMapData.getReferenceNucleotide(), ref) && Utils.stringsAreEqual(variantMapData.getVariantNucleotide(), alt)) {
+                            vmd = variantMapData;
+                        }
+                    }
+                    if (vmd.getId() != 0 && !Utils.isStringEmpty(vmd.getRsId()) && !Utils.stringsAreEqual(vmd.getRsId(), "."))
+                        id = vmd.getRsId();
+
+                    bw.write("chr" + chr + "\t" + pos + "\t" + id + "\t" + ref + "\t" + alt + "\t" + restOfLine);
+
+                }
+            }
+            bw.write("\n");
+        }// end while
+
+        br.close();
+        bw.close();
         logger.info("Total runtime -- elapsed time: "+
                 Utils.formatElapsedTime(pipeStart,System.currentTimeMillis()));
     }
