@@ -2,5 +2,6 @@
 <beans>
     <bean id="main" class="edu.mcw.rgd.genesFromSnps.Main">
         <property name="version" value="Get Genes from SNPs -- build 3/12/2024"/>
+        <property name="sampleId" value="20"/>
     </bean>
 </beans>
