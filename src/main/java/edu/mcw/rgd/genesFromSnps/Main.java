@@ -1,7 +1,11 @@
 package edu.mcw.rgd.genesFromSnps;
 
 import edu.mcw.rgd.dao.DataSourceFactory;
+import edu.mcw.rgd.datamodel.Eva;
+import edu.mcw.rgd.datamodel.RgdId;
+import edu.mcw.rgd.datamodel.SpeciesType;
 import edu.mcw.rgd.datamodel.variants.VariantMapData;
+import edu.mcw.rgd.datamodel.variants.VariantSampleDetail;
 import edu.mcw.rgd.process.Utils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -19,6 +23,7 @@ public class Main {
     protected Logger logger = LogManager.getLogger("status");
     private DAO dao = new DAO();
     private SimpleDateFormat sdt = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+    private Integer sampleId;
 
     public static void main(String[] args) throws Exception {
         DefaultListableBeanFactory bf = new DefaultListableBeanFactory();
@@ -111,12 +116,15 @@ public class Main {
         logger.info(version);
         long pipeStart = System.currentTimeMillis();
         logger.info("Pipeline started at "+sdt.format(new Date(pipeStart))+"\n");
-
+        geneCacheMap = new HashMap<>();
         String file = "data/hrdp_118strains_plus_F1_genotype_all_chr.gvcf.gz";
         BufferedReader br = openFile(file);
         BufferedWriter bw = new BufferedWriter(new FileWriter("updated_hrdp_118strains_plus_F1_genotype_all_chr.gvcf"));
         String lineData;
-
+        List<VariantMapData> tobeInserted = new ArrayList<>();
+        List<VariantMapData> existing = new ArrayList<>();
+        List<VariantSampleDetail> sampleDetails = new ArrayList<>();
+        List<VariantMapData> updateGenicstatus= new ArrayList<>();
         while ((lineData = br.readLine()) != null) {
             if (lineData.startsWith("#")){
                 bw.write(lineData+"\n");
@@ -142,10 +150,10 @@ public class Main {
                         id = cols[i];
                         break;
                     case 3:
-                        ref = cols[i];
+                        ref = cols[i].trim();
                         break;
                     case 4:
-                        alt = cols[i];
+                        alt = cols[i].trim();
                         break;
                     default:
                         if (i+1== cols.length)
@@ -158,8 +166,12 @@ public class Main {
             if (Utils.isStringEmpty(chr) || pos == 0)
                 continue;
             List<VariantMapData> vars = dao.getVariantsByLocation(chr,pos);
+            boolean found = false;
             if (vars.isEmpty()){
-                bw.write("chr"+chr+"\t"+pos+"\t"+id+"\t"+ref+"\t"+alt+"\t"+restOfLine);
+                // create variant and replace id with rgdID
+                VariantMapData v = createVariant(cols, tobeInserted);
+                sampleDetails.add(createNewVariantSampleDetail(v));
+                bw.write("chr"+chr+"\t"+pos+"\t"+v.getId()+"\t"+ref+"\t"+alt+"\t"+restOfLine);
             }
             else {
                 if (vars.size() == 1) {
@@ -167,7 +179,24 @@ public class Main {
                     if (!Utils.isStringEmpty(v.getRsId()) && !Utils.stringsAreEqual(v.getRsId(), ".")) {
                         if (Utils.stringsAreEqual(v.getReferenceNucleotide(), ref) && Utils.stringsAreEqual(v.getVariantNucleotide(), alt)) {
                             id = v.getRsId();
+                            found = true;
+                            existing.add(v); // make samples
                         }
+                    }
+                    else {
+                        id = v.getId() + "";
+                    }
+                    if (!found){
+                        v = createVariant(cols,tobeInserted);
+                    }
+                    List<VariantSampleDetail> sd = dao.getVariantSampleDetail((int) v.getId(), sampleId);
+                    if (sd.isEmpty()){
+                        sampleDetails.add(createNewVariantSampleDetail(v));
+                    }
+                    String genicStatus = isGenic((int) v.getStartPos(), (int) v.getEndPos(), v.getChromosome()) ? "GENIC":"INTERGENIC";
+                    if ( !Utils.stringsAreEqual(genicStatus, v.getGenicStatus()) || Utils.isStringEmpty(v.getGenicStatus()) ) {
+                        v.setGenicStatus(genicStatus);
+                        updateGenicstatus.add(v);
                     }
                     bw.write("chr" + chr + "\t" + pos + "\t" + id + "\t" + ref + "\t" + alt + "\t" + restOfLine);
                 } else {
@@ -175,11 +204,28 @@ public class Main {
                     for (VariantMapData variantMapData : vars) {
                         if (Utils.stringsAreEqual(variantMapData.getReferenceNucleotide(), ref) && Utils.stringsAreEqual(variantMapData.getVariantNucleotide(), alt)) {
                             vmd = variantMapData;
+                            found=true;
+                            existing.add(vmd); // make samples
                         }
                     }
-                    if (vmd.getId() != 0 && !Utils.isStringEmpty(vmd.getRsId()) && !Utils.stringsAreEqual(vmd.getRsId(), "."))
+                    if (!found){
+                        vmd = createVariant(cols,tobeInserted);
+                    }
+                    if (vmd.getId() != 0 && !Utils.isStringEmpty(vmd.getRsId()) && !Utils.stringsAreEqual(vmd.getRsId(), ".")){
                         id = vmd.getRsId();
+                    }
+                    else
+                        id = vmd.getId()+"";
+                    List<VariantSampleDetail> sd = dao.getVariantSampleDetail((int) vmd.getId(), sampleId);
+                    if (sd.isEmpty()){
+                        sampleDetails.add(createNewVariantSampleDetail(vmd));
+                    }
 
+                    String genicStatus = isGenic((int) vmd.getStartPos(), (int) vmd.getEndPos(), vmd.getChromosome()) ? "GENIC":"INTERGENIC";
+                    if ( !Utils.stringsAreEqual(genicStatus, vmd.getGenicStatus()) || Utils.isStringEmpty(vmd.getGenicStatus()) ) {
+                        vmd.setGenicStatus(genicStatus);
+                        updateGenicstatus.add(vmd);
+                    }
                     bw.write("chr" + chr + "\t" + pos + "\t" + id + "\t" + ref + "\t" + alt + "\t" + restOfLine);
 
                 }
@@ -189,6 +235,21 @@ public class Main {
 
         br.close();
         bw.close();
+
+        if (!updateGenicstatus.isEmpty()) {
+            logger.info("\t\t\tVariants Genic Status being updated: "+updateGenicstatus.size());
+            dao.updateGenicStatus(updateGenicstatus);
+        }
+        if (!tobeInserted.isEmpty()){
+            logger.info("\tNew Variants being entered: " + tobeInserted.size());
+            dao.insertVariants(tobeInserted);
+            dao.insertVariantMapData(tobeInserted);
+        }
+        if (!sampleDetails.isEmpty()){
+            logger.info("\tNew Sample Details being entered: "+ sampleDetails.size());
+            dao.insertVariantSample(sampleDetails);
+        }
+
         logger.info("Total runtime -- elapsed time: "+
                 Utils.formatElapsedTime(pipeStart,System.currentTimeMillis()));
     }
@@ -212,6 +273,60 @@ public class Main {
         return reader;
     }
 
+    VariantMapData createVariant(String[] cols, List<VariantMapData> insert) throws Exception{
+        String chr = "";
+        int pos = 0;
+        String id = "", ref = "", alt = "";
+        for (int i = 0; i < cols.length; i++){
+            switch (i){
+                case 0:
+                    chr = cols[i].replace("chr","");
+                    break;
+                case 1:
+                    pos = Integer.parseInt(cols[i]);
+                    break;
+                case 2:
+                    id = cols[i];
+                    break;
+                case 3:
+                    ref = cols[i].trim();
+                    break;
+                case 4:
+                    alt = cols[i].trim();
+                    break;
+                default:
+                    break;
+            }
+        } // end for
+        VariantMapData vmd = new VariantMapData();
+        int speciesKey= SpeciesType.getSpeciesTypeKeyForMap(3);
+        RgdId r = dao.createRgdId(RgdId.OBJECT_KEY_VARIANTS, "ACTIVE", "created by EVA pipeline", 372);
+        vmd.setId(r.getRgdId());
+        vmd.setSpeciesTypeKey(speciesKey);
+        vmd.setVariantType("snp");
+        vmd.setChromosome(chr);
+        vmd.setStartPos(pos);
+        vmd.setReferenceNucleotide(ref);
+        vmd.setVariantNucleotide(alt);
+        vmd.setEndPos(pos+1);
+        vmd.setMapKey(372);
+        String genicStat = isGenic((int) vmd.getStartPos(), (int) vmd.getEndPos(), vmd.getChromosome()) ? "GENIC":"INTERGENIC";
+        vmd.setGenicStatus(genicStat);
+        insert.add(vmd);
+        return vmd;
+    }
+
+    boolean isGenic(int start, int stop, String chr) throws Exception {
+
+        GeneCache geneCache = geneCacheMap.get(chr);
+        if( geneCache==null ) {
+            geneCache = new GeneCache();
+            geneCacheMap.put(chr, geneCache);
+            geneCache.loadCache(372, chr, DataSourceFactory.getInstance().getDataSource());
+        }
+        List<Integer> geneRgdIds = geneCache.getGeneRgdIds(start,stop);
+        return !geneRgdIds.isEmpty();
+    }
     List<Integer> getGenesWithGeneCache(int start, int stop, String chr) throws Exception {
 
        GeneCache geneCache = geneCacheMap.get(chr);
@@ -222,6 +337,15 @@ public class Main {
         }
         List<Integer> geneRgdIds = geneCache.getGeneRgdIds(start,stop);
         return geneRgdIds;
+    }
+
+    public VariantSampleDetail createNewVariantSampleDetail(VariantMapData vmd) throws Exception{
+        VariantSampleDetail vsd = new VariantSampleDetail(); // add to variant_sample_detail with eva sample leave zygosity stuff empty
+        vsd.setId(vmd.getId());
+        vsd.setSampleId(sampleId);
+        vsd.setDepth(9);
+        vsd.setVariantFrequency(1);
+        return vsd;
     }
 
     String listOfGenesToPrint(List<Integer> geneIds) throws Exception{
@@ -249,5 +373,13 @@ public class Main {
 
     public String getVersion() {
         return version;
+    }
+
+    public void setSampleId(Integer sampleId) {
+        this.sampleId = sampleId;
+    }
+
+    public Integer getSampleId() {
+        return sampleId;
     }
 }
