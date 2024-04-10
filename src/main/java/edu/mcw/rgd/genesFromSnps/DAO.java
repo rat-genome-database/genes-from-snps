@@ -94,10 +94,6 @@ public class DAO {
         return vdao.getVariantsWithGeneLocation(372,chr,pos,pos);
     }
 
-    List<VariantMapData> getVariantsByLocation(String chr, int pos) throws Exception{
-        return vdao.getVariantsWithGeneLocation(372,chr,pos,pos);
-    }
-
     public RgdId createRgdId(int objectKey, String objectStatus, String notes, int mapKey) throws Exception{
         int speciesKey=SpeciesType.getSpeciesTypeKeyForMap(mapKey);
         return managementDAO.createRgdId(objectKey, objectStatus, notes, speciesKey);
