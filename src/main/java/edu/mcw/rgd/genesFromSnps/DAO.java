@@ -146,10 +146,6 @@ public class DAO {
         bsu.flush();
     }
 
-    public void insertSampleDetail(VariantSampleDetail vs) throws Exception{
-        vdao.insertSampleDetail(vs);
-    }
-
     public void updateGenicStatus(List<VariantMapData> mapsData) throws Exception {
         BatchSqlUpdate sql2 = new BatchSqlUpdate(this.getVariantDataSource(),
                 "update variant_map_data set GENIC_STATUS=? where RGD_ID=?",
