@@ -49,7 +49,7 @@ public class Main {
     }
 
     void run() throws Exception {
-        File folder = new File("data/");
+        File folder = new File("data/human_snps/");
         List<File> files = listFilesInFolder(folder);
         geneCacheMap = new HashMap<>();
         logger.info(version);
