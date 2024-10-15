@@ -64,27 +64,27 @@ public class Main {
             while ((lineData = br.readLine()) != null) {
                 // get gene in snp region
                 if (lineData.startsWith("Locus")) {
-                    bw.write(lineData+"\tGene\tGenes Upstream\tGenes Downstream\n");
+                    bw.write(lineData+"\tGenes Upstream\tGenes Downstream\n");
                     continue;
                 }
                 bw.write(lineData);
                 String[] cols = lineData.split("\t");
                 String chr = cols[1];
                 int pos = Integer.parseInt(cols[2]);
-                List<Integer> geneIds = getGenesWithGeneCache(pos,pos,chr);
-                if (!geneIds.isEmpty()){
-                    logger.debug("\t\tGetting Gene");
-                    String geneList = listOfGenesToPrint(geneIds);
-                    bw.write("\t"+geneList);
-                }
-                else {
-                    bw.write("\t"+"-");
-                }
+//                List<Integer> geneIds = getGenesWithGeneCache(pos,pos,chr);
+//                if (!geneIds.isEmpty()){
+//                    logger.debug("\t\tGetting Gene");
+//                    String geneList = listOfGenesToPrint(geneIds);
+//                    bw.write("\t"+geneList);
+//                }
+//                else {
+//                    bw.write("\t"+"-");
+//                }
                 //get gene 1000000 upstream and 5000 downstream (start-5000)(end+100000)
                 // upstream (start, end+100000)
-                geneIds = getGenesWithGeneCache(pos,pos+100000,chr);
+                List<Integer> geneIds = getGenesWithGeneCache(pos,pos+500000,chr);
                 if (!geneIds.isEmpty()){
-                    logger.debug("\t\tGetting genes Upstream 100000");
+                    logger.debug("\t\tGetting genes Upstream 500000");
                     String geneList = listOfGenesToPrint(geneIds);
                     bw.write("\t"+geneList);
                 }
@@ -93,10 +93,10 @@ public class Main {
                 }
 
                 // downstream (start-5000, end) check if (start - 5000) < 0, set to 0
-                int downstream = (pos<=5000) ? 0 : pos-5000;
+                int downstream = (pos<=500000) ? 0 : pos-500000;
                 geneIds = getGenesWithGeneCache(downstream,pos,chr);
                 if (!geneIds.isEmpty()){
-                    logger.debug("\t\tGetting genes downstream 5000");
+                    logger.debug("\t\tGetting genes downstream 500000");
                     String geneList = listOfGenesToPrint(geneIds);
                     bw.write("\t"+geneList);
                 }
