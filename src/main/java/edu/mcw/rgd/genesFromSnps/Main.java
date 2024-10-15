@@ -67,14 +67,22 @@ public class Main {
             while ((lineData = br.readLine()) != null) {
                 // get gene in snp region
                 if (lineData.startsWith("Locus")) {
-                    bw.write(lineData+"\tGenes Upstream\tGenes Downstream\n");
+                    bw.write(lineData+"\tGene Closest\tGenes Upstream\tGenes Downstream\n");
                     continue;
                 }
                 bw.write(lineData);
                 String[] cols = lineData.split("\t");
                 String chr = cols[1];
                 int pos = Integer.parseInt(cols[2]);
-//                List<Integer> geneIds = getGenesWithGeneCache(pos,pos,chr);
+                int boundLimit = 0;
+                List<Integer> closeGeneIds = getClosestGene(boundLimit, pos, chr);
+                while (closeGeneIds.isEmpty()) {
+                    boundLimit = boundLimit + 1000;
+                    closeGeneIds = getClosestGene(boundLimit, pos, chr);
+                }
+
+                String closeGeneList = listOfGenesToPrint(closeGeneIds);
+                bw.write("\t"+closeGeneList);
 //                if (!geneIds.isEmpty()){
 //                    logger.debug("\t\tGetting Gene");
 //                    String geneList = listOfGenesToPrint(geneIds);
@@ -268,7 +276,7 @@ public class Main {
         for (File file : files){
             BufferedReader br = openFile(file.getAbsolutePath());
             logger.info("\tGetting genes for: "+file.getName());
-            BufferedWriter bw = new BufferedWriter(new FileWriter("genes_from_"+file.getName()));
+            BufferedWriter bw = new BufferedWriter(new FileWriter("closest_genes_from_"+file.getName()));
             String lineData;
             while ((lineData = br.readLine()) != null) {
                 // get gene in snp region
@@ -280,7 +288,7 @@ public class Main {
                 String[] cols = lineData.split("\t");
                 String chr = cols[1];
                 int pos = Integer.parseInt(cols[2]);
-                int boundLimit = 1000;
+                int boundLimit = 0;
                 List<Integer> geneIds = getClosestGene(boundLimit, pos, chr);
                 while (geneIds.isEmpty()) {
                     boundLimit = boundLimit + 1000;
@@ -368,8 +376,7 @@ public class Main {
             geneCacheMap.put(chr, geneCache);
             geneCache.loadCache(38, chr, DataSourceFactory.getInstance().getDataSource());
         }
-        List<Integer> geneRgdIds = geneCache.calculateClosestGene(boundLimit,pos);
-        return geneRgdIds;
+        return geneCache.calculateClosestGene(boundLimit,pos);
     }
 
 

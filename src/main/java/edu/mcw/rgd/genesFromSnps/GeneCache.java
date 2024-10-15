@@ -100,12 +100,14 @@ public class GeneCache {
     List<Integer> calculateClosestGene(int boundLimit, int pos){
         int startPos = Math.max((pos - boundLimit), 0);
         int stopPos = pos + boundLimit;
+        if (boundLimit==0){
+            return getGeneRgdIds(pos,pos);
+        }
         GeneCacheEntry key = new GeneCacheEntry(0, startPos, stopPos);
 
         List<GeneCacheEntry> geneCacheResults = new ArrayList<GeneCacheEntry>();
 
         for(int i=0;i<entries.size();i++){
-            boolean genic = false;
             GeneCacheEntry entry = entries.get(i);
             if(key.startPos >= entry.startPos && key.stopPos <= entry.stopPos)
                 geneCacheResults.add(entry);
@@ -127,7 +129,7 @@ public class GeneCache {
                 shortComparer = Math.abs(r.startPos-pos);
             }
 
-            if (shortComparer < shortestDistance){
+            if (shortComparer <= shortestDistance){
                 shortestDistance = shortComparer;
                 shorty = r;
             }
