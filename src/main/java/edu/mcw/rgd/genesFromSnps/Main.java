@@ -38,6 +38,9 @@ public class Main {
                     case "-getRsIds":
                         main.run2();
                         return;
+                    case "-close":
+                        main.closestGene();
+                        return;
 
                 }
             }
@@ -49,7 +52,7 @@ public class Main {
     }
 
     void run() throws Exception {
-        File folder = new File("data/");
+        File folder = new File("data/human_snps/");
         List<File> files = listFilesInFolder(folder);
         geneCacheMap = new HashMap<>();
         logger.info(version);
@@ -64,27 +67,35 @@ public class Main {
             while ((lineData = br.readLine()) != null) {
                 // get gene in snp region
                 if (lineData.startsWith("Locus")) {
-                    bw.write(lineData+"\tGene\tGenes Upstream\tGenes Downstream\n");
+                    bw.write(lineData+"\tGene Closest\tGenes Upstream\tGenes Downstream\n");
                     continue;
                 }
                 bw.write(lineData);
                 String[] cols = lineData.split("\t");
                 String chr = cols[1];
                 int pos = Integer.parseInt(cols[2]);
-                List<Integer> geneIds = getGenesWithGeneCache(pos,pos,chr);
-                if (!geneIds.isEmpty()){
-                    logger.debug("\t\tGetting Gene");
-                    String geneList = listOfGenesToPrint(geneIds);
-                    bw.write("\t"+geneList);
+                int boundLimit = 0;
+                List<Integer> closeGeneIds = getClosestGene(boundLimit, pos, chr);
+                while (closeGeneIds.isEmpty()) {
+                    boundLimit = boundLimit + 1000;
+                    closeGeneIds = getClosestGene(boundLimit, pos, chr);
                 }
-                else {
-                    bw.write("\t"+"-");
-                }
+
+                String closeGeneList = listOfGenesToPrint(closeGeneIds);
+                bw.write("\t"+closeGeneList);
+//                if (!geneIds.isEmpty()){
+//                    logger.debug("\t\tGetting Gene");
+//                    String geneList = listOfGenesToPrint(geneIds);
+//                    bw.write("\t"+geneList);
+//                }
+//                else {
+//                    bw.write("\t"+"-");
+//                }
                 //get gene 1000000 upstream and 5000 downstream (start-5000)(end+100000)
                 // upstream (start, end+100000)
-                geneIds = getGenesWithGeneCache(pos,pos+100000,chr);
+                List<Integer> geneIds = getGenesWithGeneCache(pos,pos+500000,chr);
                 if (!geneIds.isEmpty()){
-                    logger.debug("\t\tGetting genes Upstream 100000");
+                    logger.debug("\t\tGetting genes Upstream 500000");
                     String geneList = listOfGenesToPrint(geneIds);
                     bw.write("\t"+geneList);
                 }
@@ -93,10 +104,10 @@ public class Main {
                 }
 
                 // downstream (start-5000, end) check if (start - 5000) < 0, set to 0
-                int downstream = (pos<=5000) ? 0 : pos-5000;
+                int downstream = (pos<=500000) ? 0 : pos-500000;
                 geneIds = getGenesWithGeneCache(downstream,pos,chr);
                 if (!geneIds.isEmpty()){
-                    logger.debug("\t\tGetting genes downstream 5000");
+                    logger.debug("\t\tGetting genes downstream 500000");
                     String geneList = listOfGenesToPrint(geneIds);
                     bw.write("\t"+geneList);
                 }
@@ -254,6 +265,48 @@ public class Main {
                 Utils.formatElapsedTime(pipeStart,System.currentTimeMillis()));
     }
 
+    void closestGene() throws Exception {
+        File folder = new File("data/human_snps/");
+        List<File> files = listFilesInFolder(folder);
+        geneCacheMap = new HashMap<>();
+        logger.info(version);
+        long pipeStart = System.currentTimeMillis();
+        logger.info("Pipeline started at "+sdt.format(new Date(pipeStart))+"\n");
+//        System.out.println(files.size());
+        for (File file : files){
+            BufferedReader br = openFile(file.getAbsolutePath());
+            logger.info("\tGetting genes for: "+file.getName());
+            BufferedWriter bw = new BufferedWriter(new FileWriter("closest_genes_from_"+file.getName()));
+            String lineData;
+            while ((lineData = br.readLine()) != null) {
+                // get gene in snp region
+                if (lineData.startsWith("Locus")) {
+                    bw.write(lineData+"\tClose Gene\n");
+                    continue;
+                }
+                bw.write(lineData);
+                String[] cols = lineData.split("\t");
+                String chr = cols[1];
+                int pos = Integer.parseInt(cols[2]);
+                int boundLimit = 0;
+                List<Integer> geneIds = getClosestGene(boundLimit, pos, chr);
+                while (geneIds.isEmpty()) {
+                    boundLimit = boundLimit + 1000;
+                    geneIds = getClosestGene(boundLimit, pos, chr);
+                }
+
+                String geneList = listOfGenesToPrint(geneIds);
+                bw.write("\t"+geneList);
+
+                bw.write("\n");
+            } // end while
+            bw.close();
+            br.close();
+        }
+        logger.info("Total runtime -- elapsed time: "+
+                Utils.formatElapsedTime(pipeStart,System.currentTimeMillis()));
+    }
+
     List<File> listFilesInFolder(File folder) throws Exception {
         return Arrays.asList(Objects.requireNonNull(folder.listFiles()));
     }
@@ -316,13 +369,24 @@ public class Main {
         return vmd;
     }
 
+    List<Integer> getClosestGene(int boundLimit, int pos, String chr) throws Exception{
+        GeneCache geneCache = geneCacheMap.get(chr);
+        if( geneCache==null ) {
+            geneCache = new GeneCache();
+            geneCacheMap.put(chr, geneCache);
+            geneCache.loadCache(38, chr, DataSourceFactory.getInstance().getDataSource());
+        }
+        return geneCache.calculateClosestGene(boundLimit,pos);
+    }
+
+
     boolean isGenic(int start, int stop, String chr) throws Exception {
 
         GeneCache geneCache = geneCacheMap.get(chr);
         if( geneCache==null ) {
             geneCache = new GeneCache();
             geneCacheMap.put(chr, geneCache);
-            geneCache.loadCache(372, chr, DataSourceFactory.getInstance().getDataSource());
+            geneCache.loadCache(38, chr, DataSourceFactory.getInstance().getDataSource());
         }
         List<Integer> geneRgdIds = geneCache.getGeneRgdIds(start,stop);
         return !geneRgdIds.isEmpty();

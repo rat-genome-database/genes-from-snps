@@ -47,7 +47,7 @@ public class GeneCache {
 
     /** return list of rgd ids for genes that match a snv variant given its position
      *
-     * @param pos variant position
+     * @param stop variant position
      * @return list of matching gene rgd ids, possibly empty
      */
     List<Integer> getGeneRgdIds(int start, int stop) {
@@ -94,6 +94,48 @@ public class GeneCache {
             results.add(e.rgdId);
         }
         */
+        return results;
+    }
+
+    List<Integer> calculateClosestGene(int boundLimit, int pos){
+        int startPos = Math.max((pos - boundLimit), 0);
+        int stopPos = pos + boundLimit;
+        if (boundLimit==0){
+            return getGeneRgdIds(pos,pos);
+        }
+        GeneCacheEntry key = new GeneCacheEntry(0, startPos, stopPos);
+
+        List<GeneCacheEntry> geneCacheResults = new ArrayList<GeneCacheEntry>();
+
+        for(int i=0;i<entries.size();i++){
+            GeneCacheEntry entry = entries.get(i);
+            if(key.startPos >= entry.startPos && key.stopPos <= entry.stopPos)
+                geneCacheResults.add(entry);
+            if (key.startPos <= entry.startPos && key.stopPos >= entry.startPos)
+                geneCacheResults.add(entry);
+            if (key.startPos <= entry.stopPos && key.stopPos >= entry.stopPos)
+                geneCacheResults.add(entry);
+
+        }
+        int shortestDistance = Integer.MAX_VALUE;
+        GeneCacheEntry shorty = null;
+        List<Integer> results = new ArrayList<>();
+        for (GeneCacheEntry r : geneCacheResults){
+            int shortComparer;
+            if (r.stopPos < pos) {
+                shortComparer = Math.abs(r.stopPos-pos);
+            }
+            else{
+                shortComparer = Math.abs(r.startPos-pos);
+            }
+
+            if (shortComparer <= shortestDistance){
+                shortestDistance = shortComparer;
+                shorty = r;
+            }
+        }
+        if (shorty != null)
+            results.add(shorty.rgdId);
         return results;
     }
 

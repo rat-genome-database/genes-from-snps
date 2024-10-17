@@ -90,7 +90,6 @@ public class DAO {
         }
         return geneList;
     }
-
     List<VariantMapData> getVariantsByLocation(String chr, int pos) throws Exception{
         return vdao.getVariantsWithGeneLocation(372,chr,pos,pos);
     }
